@@ -1,0 +1,36 @@
+sudo: required
+language: generic
+
+services:
+  - docker
+
+before_install:
+  - docker build -t unaldeniz/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run unaldeniz/react-test npm test -- --coverage
+
+after_success:
+  - docker build -t unaldeniz/multi-client ./client
+  - docker build -t unaldeniz/multi-nginx ./nginx
+  - docker build -t unaldeniz/multi-server ./server
+  - docker build -t unaldeniz/multi-worker ./worker
+  # Log in to the docker CLI
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
+  # Take those images and push them to docker hub
+  - docker push unaldeniz/multi-client
+  - docker push unaldeniz/multi-nginx
+  - docker push unaldeniz/multi-server
+  - docker push unaldeniz/multi-worker
+
+deploy:
+  provider: elasticbeanstalk
+  region: us-west-1
+  app: multi-docker
+  env: MultiDocker-env
+  bucket_name: elasticbeanstalk-us-west-1-306476627547
+  bucket_path: docker-multi
+  on:
+    branch: master
+  access_key_id: $AWS_ACCESS_KEY
+  secret_access_key: $AWS_SECRET_KEY
